@@ -33,7 +33,6 @@ func main() {
 		return c.SendString("XLSX Search simple app!")
 	})
 
-	// Tüm dosyaları indeksleme endpoint'i
 	app.Get("/index", func(c *fiber.Ctx) error {
 		indexXLSXFiles("./xlsx_files")
 		return c.JSON(fiber.Map{
@@ -42,7 +41,6 @@ func main() {
 		})
 	})
 
-	// Yeni dosyaları kontrol eden endpoint
 	app.Get("/check-new", func(c *fiber.Ctx) error {
 		newFiles := checkForNewFiles("./xlsx_files")
 		return c.JSON(fiber.Map{
@@ -97,7 +95,6 @@ func checkForNewFiles(directory string) []FileIndex {
 					newFiles = append(newFiles, fileIndexMap[info.Name()])
 				}
 			} else {
-				// Yeni dosya bulunursa, indekse ekle ve listeye ekle
 				log.Printf("New file found: %s", info.Name())
 				fileIndexMap[info.Name()] = FileIndex{
 					Filename:    info.Name(),
@@ -153,7 +150,7 @@ func searchXLSX(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Printf("Search is done. Bulunan sonuç sayısı: %d", len(results))
+	log.Printf("Search is done. Searching result: %d", len(results))
 
 	if len(results) == 0 {
 		return c.JSON([]SearchResult{})

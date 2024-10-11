@@ -24,21 +24,20 @@ type FileIndex struct {
 	LastUpdated time.Time `json:"last_updated"`
 }
 
-// Global değişken olarak dosya indekslerini saklama
 var fileIndexMap = make(map[string]FileIndex)
 
 func main() {
 	app := fiber.New()
 
 	app.Get("/", func(c *fiber.Ctx) error {
-		return c.SendString("XLSX Metin Arama ve İndeksleme Uygulamasına Hoş Geldiniz!")
+		return c.SendString("XLSX Search simple app!")
 	})
 
 	// Tüm dosyaları indeksleme endpoint'i
 	app.Get("/index", func(c *fiber.Ctx) error {
 		indexXLSXFiles("./xlsx_files")
 		return c.JSON(fiber.Map{
-			"message": "Tüm dosyalar indekslendi",
+			"message": "All files indexed",
 			"files":   fileIndexMap,
 		})
 	})
@@ -47,22 +46,20 @@ func main() {
 	app.Get("/check-new", func(c *fiber.Ctx) error {
 		newFiles := checkForNewFiles("./xlsx_files")
 		return c.JSON(fiber.Map{
-			"message":  "Yeni dosyalar kontrol edildi",
+			"message":  "New files checked",
 			"newFiles": newFiles,
 		})
 	})
 
-	// Arama endpoint'i
 	app.Get("/search", searchXLSX)
 
 	log.Fatal(app.Listen(":3000"))
 }
 
-// Dizindeki tüm .xlsx dosyalarını indeksleyen fonksiyon
 func indexXLSXFiles(directory string) {
 	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Printf("Dosya erişim hatası %s: %v", path, err)
+			log.Printf("File access error %s: %v", path, err)
 			return nil
 		}
 		if !info.IsDir() && strings.HasSuffix(strings.ToLower(info.Name()), ".xlsx") {
@@ -70,30 +67,29 @@ func indexXLSXFiles(directory string) {
 				Filename:    info.Name(),
 				LastUpdated: info.ModTime(),
 			}
-			log.Printf("Dosya indekslendi: %s", info.Name())
+			log.Printf("File indexed: %s", info.Name())
 		}
 		return nil
 	})
 	if err != nil {
-		log.Printf("Dizin taranırken hata oluştu: %v", err)
+		log.Printf("Error for searching files: %v", err)
 	}
 }
 
-// Yeni dosyaları kontrol eden fonksiyon
 func checkForNewFiles(directory string) []FileIndex {
 	var newFiles []FileIndex
 
 	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Printf("Dosya erişim hatası %s: %v", path, err)
+			log.Printf("File access error %s: %v", path, err)
 			return nil
 		}
 		if !info.IsDir() && strings.HasSuffix(strings.ToLower(info.Name()), ".xlsx") {
-			// Dosya zaten indekslenmiş mi kontrol et
+
 			if indexedFile, exists := fileIndexMap[info.Name()]; exists {
-				// Eğer dosya değişmişse, güncelle ve listeye ekle
+
 				if info.ModTime().After(indexedFile.LastUpdated) {
-					log.Printf("Dosya güncellendi: %s", info.Name())
+					log.Printf("File updated: %s", info.Name())
 					fileIndexMap[info.Name()] = FileIndex{
 						Filename:    info.Name(),
 						LastUpdated: info.ModTime(),
@@ -102,7 +98,7 @@ func checkForNewFiles(directory string) []FileIndex {
 				}
 			} else {
 				// Yeni dosya bulunursa, indekse ekle ve listeye ekle
-				log.Printf("Yeni dosya bulundu: %s", info.Name())
+				log.Printf("New file found: %s", info.Name())
 				fileIndexMap[info.Name()] = FileIndex{
 					Filename:    info.Name(),
 					LastUpdated: info.ModTime(),
@@ -114,36 +110,35 @@ func checkForNewFiles(directory string) []FileIndex {
 	})
 
 	if err != nil {
-		log.Printf("Dizin taranırken hata oluştu: %v", err)
+		log.Printf("Error file searching: %v", err)
 	}
 
 	return newFiles
 }
 
-// XLSX dosyaları içinde arama yapan mevcut fonksiyon
 func searchXLSX(c *fiber.Ctx) error {
 	searchText := c.Query("text")
 	if searchText == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Arama metni belirtilmedi",
+			"error": "Text query parameter is required",
 		})
 	}
 
 	directory := "./xlsx_files"
 	var results []SearchResult
 
-	log.Printf("Arama başlatılıyor. Aranacak metin: %s", searchText)
+	log.Printf("Search starting. Searching text: %s", searchText)
 
 	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Printf("Dosya erişim hatası %s: %v", path, err)
+			log.Printf("Error file searching %s: %v", path, err)
 			return nil
 		}
 		if !info.IsDir() && strings.HasSuffix(strings.ToLower(info.Name()), ".xlsx") {
-			log.Printf("Dosya taranıyor: %s", path)
+			log.Printf("File searching: %s", path)
 			fileResults, err := searchInFile(path, searchText)
 			if err != nil {
-				log.Printf("Dosya aranırken hata oluştu %s: %v", path, err)
+				log.Printf("Error file searching %s: %v", path, err)
 				return nil
 			}
 			results = append(results, fileResults...)
@@ -152,13 +147,13 @@ func searchXLSX(c *fiber.Ctx) error {
 	})
 
 	if err != nil {
-		log.Printf("Dizin taranırken hata oluştu: %v", err)
+		log.Printf("Error file searching: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": fmt.Sprintf("Dizin taranırken hata oluştu: %v", err),
+			"error": fmt.Sprintf("Error file searching: %v", err),
 		})
 	}
 
-	log.Printf("Arama tamamlandı. Bulunan sonuç sayısı: %d", len(results))
+	log.Printf("Search is done. Bulunan sonuç sayısı: %d", len(results))
 
 	if len(results) == 0 {
 		return c.JSON([]SearchResult{})
@@ -167,21 +162,20 @@ func searchXLSX(c *fiber.Ctx) error {
 	return c.JSON(results)
 }
 
-// Bir dosyada arama yapma fonksiyonu
 func searchInFile(filePath, searchText string) ([]SearchResult, error) {
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("dosya açılamadı: %w", err)
+		return nil, fmt.Errorf("file cant open: %w", err)
 	}
 	defer f.Close()
 
 	var results []SearchResult
 
 	for _, sheetName := range f.GetSheetList() {
-		log.Printf("Sayfa taranıyor: %s in %s", sheetName, filePath)
+		log.Printf("Page searching: %s in %s", sheetName, filePath)
 		rows, err := f.GetRows(sheetName)
 		if err != nil {
-			log.Printf("Sayfa okunamadı %s in %s: %v", sheetName, filePath, err)
+			log.Printf("Page do not read %s in %s: %v", sheetName, filePath, err)
 			continue
 		}
 
@@ -198,7 +192,7 @@ func searchInFile(filePath, searchText string) ([]SearchResult, error) {
 						Cell:     cellName,
 						Content:  cell,
 					})
-					log.Printf("Eşleşme bulundu: %s in %s, hücre %s", sheetName, filePath, cellName)
+					log.Printf("Access to file: %s in %s, cell %s", sheetName, filePath, cellName)
 				}
 			}
 		}
